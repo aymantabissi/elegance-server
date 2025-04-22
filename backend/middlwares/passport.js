@@ -3,14 +3,13 @@ import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 
 // Configuration de la stratégie Google OAuth
 passport.use(new GoogleStrategy({
-    clientID: process.env.GOOGLE_CLIENT_ID,  // Ton Client ID de Google
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET,  // Ton Client Secret de Google
-    callbackURL: "http://localhost:5000/auth/google/callback", 
-    scope:["profile","email"], // L'URL de redirection après l'authentification
+    clientID: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackURL: "http://localhost:5000/api/auth/google/callback", // Match frontend expectation
+    scope: ["profile", "email"]
   },
-  function(accessToken, refreshToken, profile, callback){
-    callback(null, profile); // Ici, tu peux enregistrer l'utilisateur dans ta base de données si nécessaire
-
+  function(accessToken, refreshToken, profile, callback) {
+    callback(null, profile);
   }
 ));
 

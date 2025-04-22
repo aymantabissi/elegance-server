@@ -4,14 +4,15 @@ import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import jwt_decode from "jwt-decode";
-import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google'; // استيراد GoogleOAuthProvider
+import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 
 function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  // تحقق من صلاحية التوكن
+  // Verify token validity
   const verifyToken = () => {
     const token = localStorage.getItem("token");
     if (!token) return false;
@@ -23,113 +24,101 @@ function Login() {
       return false;
     }
   };
-  // Add at the beginning of your Home component
-useEffect(() => {
-  const token = localStorage.getItem("token");
-  if (token) {
-    try {
-      const decoded = jwt_decode(token);
-      console.log("DEBUG: Token contents:", decoded);
-    } catch (err) {
-      console.error("ERROR: Token decode failed:", err);
-    }
-  }
-}, []);
 
+  // Debug token on component mount
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      try {
+        const decoded = jwt_decode(token);
+        console.log("DEBUG: Token contents:", decoded);
+      } catch (err) {
+        console.error("ERROR: Token decode failed:", err);
+      }
+    }
+  }, []);
+
+  // Redirect if already logged in
   useEffect(() => {
     if (verifyToken()) {
       const decoded = jwt_decode(localStorage.getItem("token"));
-      if (decoded.role === "admin") {
-        navigate("/dashboard");
-      } else {
-        navigate("/home");
-      }
+      navigate(decoded.role === "admin" ? "/dashboard" : "/home");
     }
   }, [navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
 
     if (!email || !password) {
       toast.error("❌ Veuillez remplir tous les champs !");
+      setLoading(false);
       return;
     }
 
     try {
-      // Send request to backend API with email and password
       const response = await axios.post(
-        "http://localhost:5000/api/login", // Updated backend URL
+        "http://localhost:5000/api/login",
         { email, password },
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
+        { headers: { "Content-Type": "application/json" } }
       );
 
-      const { token } = response.data;
+      const { token, user } = response.data;
       if (!token) {
         toast.error("❌ Token not received!");
+        setLoading(false);
         return;
       }
 
-      // Save token in local storage
       localStorage.setItem("token", token);
-
-      // Decode the token to get user role
       const decodedToken = jwt_decode(token);
 
-      // Check role and navigate accordingly
-      if (decodedToken.role === "admin") {
-        toast.success("✅ Connexion réussie ! Bienvenue administrateur.");
-        setTimeout(() => navigate("/dashboard"), 2000);
-      } else {
-        toast.success("✅ Connexion réussie !");
-        setTimeout(() => navigate("/home"), 2000);
-      }
-      
+      toast.success(`✅ Connexion réussie ! ${decodedToken.role === "admin" ? "Bienvenue administrateur." : ""}`);
+      setTimeout(() => navigate(decodedToken.role === "admin" ? "/dashboard" : "/home"), 2000);
     } catch (error) {
       console.error("Login error:", error);
-      let errorMessage = error.response?.data?.message || "❌ Erreur lors de la connexion !";
+      const errorMessage = error.response?.data?.message || "❌ Erreur lors de la connexion !";
       toast.error(errorMessage);
+      setLoading(false);
     }
   };
 
-  const responseGoogle = async (response) => {
+  const handleGoogleSuccess = async (credentialResponse) => {
     try {
-      console.log(response);
-      // تحقق من البيانات واستخرج الـ token من Google
-      const googleToken = response.credential; // Example of how you would get the token.
-      
-      // Send token to backend for validation and user authentication
-      const res = await axios.post("http://localhost:5000/api/auth/google/callback", { token: googleToken });
+      setLoading(true);
+      console.log("Google credential received:", credentialResponse);
 
-      const { token } = res.data;
-      localStorage.setItem("token", token);
-      try {
-        const decodedToken = jwt_decode(token);
-        console.log("DEBUG: Login successful, token contains:", {
-          id: decodedToken.id,
-          name: decodedToken.name,
-          role: decodedToken.role,
-          age: decodedToken.age,
-          gender: decodedToken.gender,
-          country: decodedToken.country
-        });}catch (error) {
-          console.error("ERROR: Could not decode token", error);
-        }
-      
-  
-      if (token) {
-        localStorage.setItem("token", token);
-        const decoded = jwt_decode(token);
-        navigate(decoded.role === "admin" ? "/dashboard" : "/home");
-        toast.success("✅ Connexion réussie avec Google !");
+      if (!credentialResponse.credential) {
+        throw new Error("No credential received from Google");
       }
-      
+
+      const response = await axios.post(
+        "http://localhost:5000/api/auth/google",
+        { credential: credentialResponse.credential }
+      );
+
+      const { token, user } = response.data;
+      localStorage.setItem("token", token);
+
+      const decodedToken = jwt_decode(token);
+      toast.success(`✅ Connexion Google réussie ! ${decodedToken.name ? `Bienvenue ${decodedToken.name}` : ''}`);
+
+      setTimeout(() => {
+        navigate(decodedToken.role === "admin" ? "/dashboard" : "/home");
+      }, 2000);
     } catch (error) {
-      toast.error("❌ Erreur lors de la connexion avec Google !");
+      console.error("Google login error:", error);
+      const errorMessage = error.response?.data?.message || 
+                         error.message || 
+                         "❌ Connexion Google échouée";
+      toast.error(errorMessage);
+      setLoading(false);
     }
+  };
+
+  const handleGoogleFailure = () => {
+    console.log("Google login failed");
+    toast.error("❌ La connexion avec Google a échoué");
   };
 
   return (
@@ -156,6 +145,7 @@ useEffect(() => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full p-3 mt-1 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
+              disabled={loading}
             />
           </div>
 
@@ -167,14 +157,18 @@ useEffect(() => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full p-3 mt-1 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
+              disabled={loading}
             />
           </div>
 
           <button
             type="submit"
-            className="w-full p-3 mt-4 bg-blue-600 text-white font-bold rounded-md hover:bg-blue-700 transition-all duration-300 transform hover:scale-105"
+            className={`w-full p-3 mt-4 bg-blue-600 text-white font-bold rounded-md hover:bg-blue-700 transition-all duration-300 ${
+              loading ? "opacity-70 cursor-not-allowed" : "hover:scale-105"
+            }`}
+            disabled={loading}
           >
-            Se connecter
+            {loading ? "Connexion en cours..." : "Se connecter"}
           </button>
         </form>
 
@@ -185,19 +179,27 @@ useEffect(() => {
         </div>
 
         {/* Google Login */}
-        <GoogleOAuthProvider clientId="95872693443-5hbop4agfons9mhdf5521glk04rgdo5d.apps.googleusercontent.com">
-  <GoogleLogin
-    onSuccess={responseGoogle}
-    onError={() => console.log('Login Failed')}
-    cookiePolicy={'single_host_origin'}
-    className="w-full flex items-center justify-center p-3 border border-gray-300 rounded-md text-gray-600 hover:bg-gray-200 transition"
-  />
-</GoogleOAuthProvider>
-
+        <div className="flex justify-center">
+          <GoogleOAuthProvider clientId={"95872693443-5hbop4agfons9mhdf5521glk04rgdo5d.apps.googleusercontent.com"}>
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={handleGoogleFailure}
+              cookiePolicy={'single_host_origin'}
+              locale="fr"
+              text="continue_with"
+              shape="rectangular"
+              size="large"
+              width="350"
+            />
+          </GoogleOAuthProvider>
+        </div>
 
         <p className="text-center text-gray-600 mt-4">
           Nouveau client ?{" "}
-          <Link to="/Register" className="text-blue-600 hover:underline font-semibold">
+          <Link 
+            to="/Register" 
+            className="text-blue-600 hover:underline font-semibold"
+          >
             Créez un compte
           </Link>
         </p>

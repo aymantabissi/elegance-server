@@ -35,8 +35,8 @@ app.use(cors());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.use((req, res, next) => {
-  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');  // ou 'unsafe-none' pour plus de flexibilité
-  res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp'); // Peut être utilisé pour le contrôle des ressources
+  res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
+  res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
   next();
 });
 
@@ -47,6 +47,9 @@ app.use(session({
   cookie: { secure: false } // Utilise true si tu as un environnement HTTPS
 }));
 
+app.use(passport.initialize()); // Initialize passport for authentication
+app.use(passport.session()); // Initialize session support for passport
+
 // API routes
 app.use("/api/products", ProductRoutes);
 app.use("/api/orders", orderRoutes);
@@ -56,8 +59,6 @@ app.use("/api", AiRoutes);
 app.use("/api/user", userRoutes); 
 app.use('/api/users', ProfileRoutes);
 
-app.use(passport.initialize()); // Initialize passport for authentication
-app.use(passport.session()); // Initialize session support for passport
 
 app.use("/", actionRoutes);
 
