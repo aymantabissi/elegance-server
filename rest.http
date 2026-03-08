@@ -1,3 +1,14 @@
+<<<<<<< HEAD
 GET "http://localhost:5000/uploads/default-image.jpg";
+=======
+GET "http://localhost:5000/uploads/your-image.jpg";
+POST  "http://localhost:5000/api/login",{
+    {
+  "email": "lamisse@example.com",
+  "password": "1212"
+}
+}
+
+>>>>>>> cfc2b4b37005384f7e932f3fa694123144c7f52d
 
 
